@@ -2,7 +2,8 @@ name: CI/CD Pipeline
 
 on:
   push:
-    tags:
+    branches: [ master ]  # 监听main分支的push事件，用于自动部署
+    tags:                # 监听标签推送，用于创建Release
       - '*'
 
 jobs:
@@ -23,13 +24,60 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Build
-        run: |
-          npm install
-          npx webpack --config webpack.config.js --mode production
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist-${{ matrix.node-version }}
+          path: dist
+
+  # 创建Release（仅当推送标签时执行）
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-16.x
+          path: dist
+
       - name: Release
         uses: ncipollo/release-action@v1
         with:
           artifacts: "dist"
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  # 部署到GitHub Pages（仅当推送main分支时执行）
+  deploy-to-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: dist-16.x
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
