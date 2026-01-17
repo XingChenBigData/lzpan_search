@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]  # 监听main分支的push事件，用于自动部署
+    branches: [ master ]  # 监听main分支的push事件，用于自动部署
     tags:                # 监听标签推送，用于创建Release
       - '*'
 
